@@ -1,6 +1,7 @@
 from AcmException import ACMException
 import json
 import requests
+import time
 
 
 class AcmAPI:
@@ -42,7 +43,6 @@ class AcmAPI:
         else:
             raise ACMException(Exception)
         if self.__caseID is not None and self.__post_send_check() is True:
-            print(3)
             self.__post_send = {'Content-type': 'application/json', 'X-ACM-Key': self.__key,
                                 'X-ACM-Chanel': self.__channel, 'X-ACM-Transmitter': self.__team_header}
             self.POST_SEND_MESSAGE = 'https://api.acm.chat/rest/v2/cases/' + self.__caseID + '/chats/messages'
@@ -66,34 +66,46 @@ class AcmAPI:
             except json.JSONDecodeError:
                 pure_message = message
             data = {'message': pure_message}
-            print('All ready')
-            print(self.POST_SEND_MESSAGE)
-            print(data)
-            print(self.__post_send)
             requests.post(self.POST_SEND_MESSAGE, headers=self.__post_send, data=json.dumps(data))
         else:
             # Incorrect message type
             raise ACMException(Exception)
 
-    # Function will return a json string that will contain all subjects
-    def receive_unreaded_json_raw(self):
-        receiver = requests.get(self.GET_UNREAD_MESSAGES, headers=self.__unread_header)
-        try:
-            raw_data = receiver.json()
-            return raw_data
-        except ValueError:
-            return {}
+    """
+    Generators work like any other iterable objects. 
+    Make sure to Thread this thing or subprocess, because of infinite loop, but code wasn't tested for ThreadSafe
+    
+    """
+    # Function will return a generator with json object that will contain all subjects
+    # In case if there are no messages you will receive None (like in redis when you pubsub)
+    # Feel free to overwrite delay. Default is 1 sec.
+    def receive_unreaded_json_raw(self, delay=1):
+        if not isinstance(delay, int):
+            delay = 1
+        while 1:
+            receiver = requests.get(self.GET_UNREAD_MESSAGES, headers=self.__unread_header)
+            try:
+                raw_data = receiver.json()
+                yield raw_data
+                time.sleep(delay)
+            except ValueError:
+                yield None
+                time.sleep(delay)
 
-    # Function will return a json string that will contain all subjects
-    def recieve_unreaded_message(self):
-        receiver = requests.get(self.GET_UNREAD_MESSAGES, headers=self.__unread_header)
-        try:
-            raw_data = receiver.json()
-            message_pool = []
-            for every_message in range(0, len(raw_data)):
-                message_body = raw_data[every_message]['nextState']
+    # Function will return a generator with pure messages
+    # In case if there are no messages you will receive None (like in redis when you pubsub)
+    # Feel free to overwrite delay. Default is 1 sec.
+    def recieve_unreaded_message(self, delay=1):
+        if not isinstance(delay, int):
+            delay = 1
+        while 1:
+            receiver = requests.get(self.GET_UNREAD_MESSAGES, headers=self.__unread_header)
+            try:
+                raw_data = receiver.json()
+                message_body = raw_data[0]['nextState']
                 message_text = message_body['message']
-                message_pool.append(message_text)
-            return message_pool
-        except ValueError:
-            return []
+                yield message_text
+                time.sleep(delay)
+            except ValueError:
+                yield None
+                time.sleep(delay)
