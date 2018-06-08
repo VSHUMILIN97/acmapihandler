@@ -50,7 +50,7 @@ class AcmAPI:
             raise ACMException(Exception)
 
     # If you calling this function, you apply, that everything is fine
-    async def setup_environment(self, channel, key, t_head, case_id):
+    def setup_environment(self, channel, key, t_head, case_id):
         self.__channel = channel
         self.__key = key
         self.__team_header = t_head
@@ -73,7 +73,7 @@ class AcmAPI:
 
     """
     Generators work like any other iterable objects. 
-    Make sure to Thread this thing or subprocess, because of infinite loop, but code wasn't tested for ThreadSafe
+    Make sure to Thread every instance of it or use subprocess.
     
     """
     # Function will return a generator with json object that will contain all subjects
